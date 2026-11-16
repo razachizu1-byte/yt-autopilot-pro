@@ -8,10 +8,19 @@ jobs:
       - name: Unzip Source Code
         shell: pwsh
         run: Expand-Archive -Path "yt-autopilot-pro-source.zip" -DestinationPath "." -Force
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Build Standalone Python Backend (yt-backend.exe)
+        working-directory: ./yt-autopilot-pro/backend
+        run: |
+          pip install -r requirements.txt pyinstaller
+          pyinstaller --noconfirm --onedir --name yt-backend --paths . --hidden-import=uvicorn.logging --hidden-import=uvicorn.loops.auto --hidden-import=uvicorn.protocols.http.auto --hidden-import=uvicorn.lifespan.on --distpath ../backend_bin run_server.py
+          xcopy /E /I /Y ..\backend_bin\yt-backend\* ..\backend_bin\
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Build Windows EXE
+      - name: Build Full Windows Installer (.exe)
         working-directory: ./yt-autopilot-pro/desktop
         run: |
           npm install
