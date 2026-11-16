@@ -5,18 +5,30 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Unzip Source Code
+      - name: Unzip & Patch Source
         shell: pwsh
-        run: Expand-Archive -Path "yt-autopilot-pro-source.zip" -DestinationPath "." -Force
+        run: |
+          Expand-Archive -Path "yt-autopilot-pro-source.zip" -DestinationPath "." -Force
+          if (-not (Test-Path "yt-autopilot-pro/backend/run_server.py")) {
+            Set-Content -Path "yt-autopilot-pro/backend/run_server.py" -Value "import uvicorn`nfrom app.main import app`nif __name__ == '__main__':`n    uvicorn.run(app, host='127.0.0.1', port=8765)"
+          }
+          $appTsx = Get-Content "yt-autopilot-pro/desktop/src/App.tsx" -Raw
+          if ($appTsx -match "const API_BASE = '/api/v1';") {
+            $appTsx = $appTsx -replace "const API_BASE = '/api/v1';", "const BACKEND_ORIGIN = window.location.protocol === 'file:' ? 'http://127.0.0.1:8765' : '';`nconst API_BASE = BACKEND_ORIGIN + '/api/v1';"
+            $appTsx = $appTsx -replace "v\.thumbnail\.image_url", "(BACKEND_ORIGIN + v.thumbnail.image_url)"
+            Set-Content -Path "yt-autopilot-pro/desktop/src/App.tsx" -Value $appTsx
+          }
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Build Standalone Python Backend (yt-backend.exe)
+      - name: Build Standalone Python Backend
+        shell: pwsh
         working-directory: ./yt-autopilot-pro/backend
         run: |
           pip install -r requirements.txt pyinstaller
-          pyinstaller --noconfirm --onedir --name yt-backend --paths . --hidden-import=uvicorn.logging --hidden-import=uvicorn.loops.auto --hidden-import=uvicorn.protocols.http.auto --hidden-import=uvicorn.lifespan.on --distpath ../backend_bin run_server.py
-          xcopy /E /I /Y ..\backend_bin\yt-backend\* ..\backend_bin\
+          pyinstaller --noconfirm --onedir --name yt-backend --paths . --hidden-import=uvicorn.logging --hidden-import=uvicorn.loops.auto --hidden-import=uvicorn.protocols.http.auto --hidden-import=uvicorn.lifespan.on --distpath ../backend_bin_dist run_server.py
+          New-Item -ItemType Directory -Force -Path ../backend_bin | Out-Null
+          Copy-Item -Path ../backend_bin_dist/yt-backend/* -Destination ../backend_bin/ -Recurse -Force
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
