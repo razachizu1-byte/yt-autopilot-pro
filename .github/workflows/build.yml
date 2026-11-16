@@ -1,0 +1,22 @@
+name: Build Windows EXE
+on: [push, workflow_dispatch]
+jobs:
+  windows-exe:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unzip Source Code
+        shell: pwsh
+        run: Expand-Archive -Path "yt-autopilot-pro-source.zip" -DestinationPath "." -Force
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Build Windows EXE
+        working-directory: ./yt-autopilot-pro/desktop
+        run: |
+          npm install
+          npm run dist:win
+      - uses: actions/upload-artifact@v4
+        with:
+          name: YT-AutoPilot-Pro-Windows-x64-Installer
+          path: yt-autopilot-pro/desktop/release/*.exe
